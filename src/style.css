@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100svh;
+  background: oklch(10.5% 0.018 342);
+  font-family: var(--font-sans);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .memory-card {
+    position: absolute;
+    overflow: hidden;
+    border-radius: 1.25rem;
+    border: 1px solid oklch(68% 0.13 354 / 0.22);
+    background:
+      radial-gradient(circle at 52% 34%, oklch(84% 0.12 47 / 0.9) 0 8%, transparent 23%),
+      radial-gradient(circle at 38% 44%, oklch(54% 0.14 20 / 0.7) 0 10%, transparent 28%),
+      linear-gradient(135deg, oklch(21% 0.035 348), oklch(13% 0.02 338) 48%, oklch(30% 0.085 18));
+    box-shadow:
+      0 18px 42px oklch(5% 0.015 342 / 0.5),
+      0 0 30px oklch(66% 0.2 357 / 0.16);
+    opacity: 0.72;
+  }
+
+  .memory-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(115deg, transparent 0 42%, oklch(96% 0.04 32 / 0.16) 44% 48%, transparent 52%),
+      radial-gradient(circle at 64% 58%, oklch(91% 0.07 30 / 0.18), transparent 32%),
+      linear-gradient(to bottom, transparent, oklch(8% 0.02 342 / 0.58));
+  }
+
+  .memory-card::after {
+    content: "";
+    position: absolute;
+    inset: 12% 12% auto auto;
+    width: 26%;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: oklch(67% 0.22 356 / 0.32);
+    filter: blur(18px);
+  }
+
+  .memory-card-a {
+    left: -10%;
+    top: 8%;
+    width: 48%;
+    aspect-ratio: 0.74;
+    transform: rotate(-13deg);
+  }
+
+  .memory-card-b {
+    right: -8%;
+    top: 11%;
+    width: 43%;
+    aspect-ratio: 0.78;
+    transform: rotate(12deg);
+  }
+
+  .memory-card-c {
+    left: 6%;
+    top: 35%;
+    width: 36%;
+    aspect-ratio: 0.8;
+    transform: rotate(8deg);
+  }
+
+  .memory-card-d {
+    right: 8%;
+    top: 41%;
+    width: 38%;
+    aspect-ratio: 0.78;
+    transform: rotate(-8deg);
+  }
+
+  .memory-card-e {
+    left: 27%;
+    bottom: 9%;
+    width: 44%;
+    aspect-ratio: 1.05;
+    transform: rotate(4deg);
+  }
+
+  .romance-progress {
+    --progress: 0%;
+    width: 100%;
+    height: 0.5rem;
+    cursor: pointer;
+    appearance: none;
+    border-radius: 999px;
+    background:
+      linear-gradient(
+        to right,
+        oklch(69% 0.21 356) 0 var(--progress),
+        oklch(96% 0.012 348 / 0.2) var(--progress) 100%
+      );
+    outline: none;
+  }
+
+  .romance-progress:focus-visible {
+    outline: 2px solid oklch(69% 0.21 356);
+    outline-offset: 6px;
+  }
+
+  .romance-progress::-webkit-slider-thumb {
+    width: 0.95rem;
+    height: 0.95rem;
+    appearance: none;
+    border: 2px solid oklch(96% 0.012 348 / 0.92);
+    border-radius: 999px;
+    background: oklch(69% 0.21 356);
+    box-shadow: 0 0 22px oklch(69% 0.21 356 / 0.56);
+  }
+
+  .romance-progress::-moz-range-thumb {
+    width: 0.95rem;
+    height: 0.95rem;
+    border: 2px solid oklch(96% 0.012 348 / 0.92);
+    border-radius: 999px;
+    background: oklch(69% 0.21 356);
+    box-shadow: 0 0 22px oklch(69% 0.21 356 / 0.56);
+  }
+
+  .romance-screen-scroll {
+    scrollbar-width: none;
+  }
+
+  .romance-screen-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
