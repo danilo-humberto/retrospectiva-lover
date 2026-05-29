@@ -30,6 +30,8 @@ export function StoryViewer({
 }: StoryViewerProps) {
   const activeMemory = activeIndex === null ? null : memories[activeIndex]
   const currentIndex = activeIndex ?? 0
+  const activeMemoryImageUrl =
+    activeMemory?.imageUrl ?? activeMemory?.imagePreviewUrl
 
   useEffect(() => {
     if (!activeMemory) return
@@ -73,9 +75,9 @@ export function StoryViewer({
             transition={{ duration: 0.28, ease: 'easeOut' }}
             onClick={(event) => event.stopPropagation()}
           >
-            {activeMemory.imagePreviewUrl && (
+            {activeMemoryImageUrl && (
               <img
-                src={activeMemory.imagePreviewUrl}
+                src={activeMemoryImageUrl}
                 alt="Memória em story"
                 className="absolute inset-0 h-full w-full object-cover"
               />
@@ -124,7 +126,7 @@ export function StoryViewer({
             </button>
 
             <div className="relative flex h-full items-center justify-center px-8">
-              {!activeMemory.imagePreviewUrl && (
+              {!activeMemoryImageUrl && (
                 <div className="flex h-28 w-28 items-center justify-center rounded-full border border-white/18 bg-black/18 text-rose-100 shadow-[0_0_54px_rgba(255,90,144,0.34)] backdrop-blur-xl">
                   <Camera className="h-12 w-12" />
                 </div>

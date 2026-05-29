@@ -14,6 +14,7 @@ type CreateStepCardProps = {
   onPrevious: () => void
   onNext: () => void
   primaryActionLabel: string
+  isSubmitting?: boolean
   children?: ReactNode
 }
 
@@ -23,6 +24,7 @@ export function CreateStepCard({
   onPrevious,
   onNext,
   primaryActionLabel,
+  isSubmitting = false,
   children,
 }: CreateStepCardProps) {
   const hasCustomContent = Array.isArray(children)
@@ -88,7 +90,7 @@ export function CreateStepCard({
             type="button"
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-pearl/12 bg-pearl/7 px-4 text-sm font-bold text-pearl transition duration-200 hover:bg-pearl/12 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blush disabled:cursor-not-allowed disabled:opacity-40"
             onClick={onPrevious}
-            disabled={isFirstStep}
+            disabled={isFirstStep || isSubmitting}
           >
             <ChevronLeft className="size-4" strokeWidth={2.4} aria-hidden="true" />
             Voltar
@@ -98,6 +100,7 @@ export function CreateStepCard({
             type="button"
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-blush px-4 text-sm font-bold text-pearl shadow-romance-button transition duration-200 hover:bg-roseglow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blush disabled:cursor-not-allowed disabled:opacity-55"
             onClick={onNext}
+            disabled={isSubmitting}
           >
             {primaryActionLabel}
             <ChevronRight className="size-4" strokeWidth={2.4} aria-hidden="true" />

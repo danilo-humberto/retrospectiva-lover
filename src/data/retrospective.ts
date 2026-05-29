@@ -1,14 +1,20 @@
 export type RetrospectiveMemory = {
   id: number
-  title?: string
-  caption?: string
+  imageUrl?: string
   imagePreviewUrl?: string
 }
 
 export type RetrospectiveData = {
+  id?: string
+  slug?: string
+  createdAt?: string
   coupleName: string
   retrospectiveTitle: string
   subtitle: string
+  coverUrl?: string
+  coverPreviewUrl?: string
+  storyPhotoUrl?: string
+  storyPhotoPreviewUrl?: string
   songTitle: string
   artistName: string
   audioUrl: string
@@ -36,35 +42,11 @@ export const retrospectiveData: RetrospectiveData = {
   ],
 
   memories: [
-    {
-      id: 1,
-      title: 'Nosso primeiro momento',
-      caption: 'O começo de tudo.',
-    },
-    {
-      id: 2,
-      title: 'Uma lembrança especial',
-      caption: 'Daquelas que ficam para sempre.',
-    },
-    {
-      id: 3,
-      title: 'Risadas sinceras',
-      caption: 'A felicidade morando nos detalhes.',
-    },
-    {
-      id: 4,
-      title: 'Nosso lugar',
-      caption: 'Onde o tempo passa diferente.',
-    },
-    {
-      id: 5,
-      title: 'Mais uma página',
-      caption: 'Uma história escrita com carinho.',
-    },
-    {
-      id: 6,
-      title: 'Pra guardar no coração',
-      caption: 'Porque algumas memórias viram lar.',
-    },
+    { id: 1 },
+    { id: 2 },
+    { id: 3 },
+    { id: 4 },
+    { id: 5 },
+    { id: 6 },
   ],
 }

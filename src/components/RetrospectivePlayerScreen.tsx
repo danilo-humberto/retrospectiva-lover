@@ -35,6 +35,7 @@ export function RetrospectivePlayerScreen({
   const [playbackError, setPlaybackError] = useState<string | null>(null)
 
   const progress = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0
+  const coverImageUrl = displayData.coverUrl ?? displayData.coverPreviewUrl
   const coupleInitials =
     displayData.coupleName
       .split('&')
@@ -144,29 +145,42 @@ export function RetrospectivePlayerScreen({
               <div className="absolute inset-5 rounded-[2rem] bg-blush/35 blur-3xl" aria-hidden="true" />
 
               <div className="relative aspect-square overflow-hidden rounded-[1.65rem] bg-[radial-gradient(circle_at_55%_24%,oklch(80%_0.16_18)_0%,transparent_25%),radial-gradient(circle_at_24%_76%,oklch(62%_0.2_316_/_0.86)_0%,transparent_34%),linear-gradient(135deg,oklch(70%_0.2_356),oklch(31%_0.12_345)_48%,oklch(20%_0.09_300))] shadow-[0_0_0_1px_oklch(96%_0.012_348_/_0.18),0_26px_70px_oklch(67%_0.2_356_/_0.28)]">
-                <div className="absolute inset-0 bg-[linear-gradient(135deg,oklch(100%_0_0_/_0.22),transparent_34%),radial-gradient(circle_at_50%_50%,transparent_0_38%,oklch(8%_0.02_342_/_0.38)_72%)]" />
-                <div className="absolute inset-8 rounded-full border border-pearl/18" />
-                <div className="absolute left-1/2 top-[38%] size-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-pearl/16" />
-                <div className="relative flex h-full flex-col items-center justify-center gap-5">
-                  <motion.div
-                    className="grid size-24 place-items-center rounded-full bg-ink/48 text-pearl shadow-[0_0_44px_oklch(96%_0.012_348_/_0.14)] ring-1 ring-pearl/18 backdrop-blur-md"
-                    animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
-                    transition={{
-                      duration: 8,
-                      ease: 'linear',
-                      repeat: isPlaying ? Infinity : 0,
-                    }}
-                  >
-                    <Disc3 className="size-12" strokeWidth={1.8} aria-hidden="true" />
-                  </motion.div>
+                {coverImageUrl ? (
+                  <>
+                    <img
+                      src={coverImageUrl}
+                      alt="Capa da retrospectiva"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-[linear-gradient(135deg,oklch(100%_0_0_/_0.16),transparent_34%),radial-gradient(circle_at_50%_50%,transparent_0_48%,oklch(8%_0.02_342_/_0.52)_100%)]" />
+                  </>
+                ) : (
+                  <>
+                    <div className="absolute inset-0 bg-[linear-gradient(135deg,oklch(100%_0_0_/_0.22),transparent_34%),radial-gradient(circle_at_50%_50%,transparent_0_38%,oklch(8%_0.02_342_/_0.38)_72%)]" />
+                    <div className="absolute inset-8 rounded-full border border-pearl/18" />
+                    <div className="absolute left-1/2 top-[38%] size-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-pearl/16" />
+                    <div className="relative flex h-full flex-col items-center justify-center gap-5">
+                      <motion.div
+                        className="grid size-24 place-items-center rounded-full bg-ink/48 text-pearl shadow-[0_0_44px_oklch(96%_0.012_348_/_0.14)] ring-1 ring-pearl/18 backdrop-blur-md"
+                        animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
+                        transition={{
+                          duration: 8,
+                          ease: 'linear',
+                          repeat: isPlaying ? Infinity : 0,
+                        }}
+                      >
+                        <Disc3 className="size-12" strokeWidth={1.8} aria-hidden="true" />
+                      </motion.div>
 
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.35em] text-pearl/75">{coupleInitials}</p>
-                    <p className="mx-auto mt-2 max-w-40 truncate text-xs font-medium text-pearl/62">
-                      {displayData.subtitle}
-                    </p>
-                  </div>
-                </div>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.35em] text-pearl/75">{coupleInitials}</p>
+                        <p className="mx-auto mt-2 max-w-40 truncate text-xs font-medium text-pearl/62">
+                          {displayData.subtitle}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div
@@ -267,6 +281,9 @@ export function RetrospectivePlayerScreen({
               <TimeTogetherCard
                 coupleName={displayData.coupleName}
                 startDate={displayData.startDate}
+                storyPhotoUrl={
+                  displayData.storyPhotoUrl ?? displayData.storyPhotoPreviewUrl
+                }
               />
             </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Camera,
@@ -11,12 +12,17 @@ import {
 } from 'lucide-react'
 
 import { CreateStepCard } from '../components/create/CreateStepCard'
+import { RetrospectiveCreatedCard } from '../components/create/RetrospectiveCreatedCard'
 import { StepIndicator } from '../components/create/StepIndicator'
 import {
   retrospectiveData,
   type RetrospectiveData,
   type RetrospectiveMemory,
 } from '../data/retrospective'
+import { createRetrospective } from '../services/createRetrospective'
+import { uploadCoverImage } from '../services/uploadCoverImage'
+import { uploadMemoryImage } from '../services/uploadMemoryImage'
+import { uploadStoryPhoto } from '../services/uploadStoryPhoto'
 
 const createSteps = [
   {
@@ -42,6 +48,7 @@ const createSteps = [
 ] as const
 
 type CreateRetrospectiveScreenProps = {
+  onCreated?: (formData: RetrospectiveData) => void
   onFinish: (formData: RetrospectiveData) => void
 }
 
@@ -50,6 +57,10 @@ type MainDataForm = {
   retrospectiveTitle: string
   subtitle: string
   startDate: string
+  coverFile?: File
+  coverPreviewUrl?: string
+  storyPhotoFile?: File
+  storyPhotoPreviewUrl?: string
 }
 
 type MusicMessageForm = {
@@ -118,9 +129,25 @@ const formatPreviewDate = (value: string) => {
   return `${day}/${month}/${year}`
 }
 
+const getPublicRetrospectiveUrl = (slug?: string) => {
+  if (!slug) {
+    return ''
+  }
+
+  const publicPath = `/retrospectiva/${encodeURIComponent(slug)}`
+
+  if (typeof window === 'undefined') {
+    return publicPath
+  }
+
+  return `${window.location.origin}${publicPath}`
+}
+
 export function CreateRetrospectiveScreen({
+  onCreated,
   onFinish,
 }: CreateRetrospectiveScreenProps) {
+  const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
   const [mainData, setMainData] = useState<MainDataForm>({
     coupleName: '',
@@ -129,14 +156,19 @@ export function CreateRetrospectiveScreen({
     startDate: '',
   })
   const [musicMessage, setMusicMessage] = useState<MusicMessageForm>({
-    songTitle: retrospectiveData.songTitle,
-    artistName: retrospectiveData.artistName,
-    lyricsText: retrospectiveData.lyrics.join('\n'),
+    songTitle: '',
+    artistName: '',
+    lyricsText: '',
   })
   const [memoryItems, setMemoryItems] = useState<CreateMemory[]>([{ id: 1 }])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [createdRetrospective, setCreatedRetrospective] =
+    useState<RetrospectiveData | null>(null)
   const nextMemoryIdRef = useRef(2)
   const memoryItemsRef = useRef(memoryItems)
-  const shouldPreserveMemoryUrlsRef = useRef(false)
+  const coverPreviewUrlRef = useRef<string | undefined>(undefined)
+  const storyPhotoPreviewUrlRef = useRef<string | undefined>(undefined)
 
   const currentStepData = useMemo(
     () => createSteps.find((step) => step.id === currentStep) ?? createSteps[0],
@@ -190,30 +222,80 @@ export function CreateRetrospectiveScreen({
   }, [memoryItems])
 
   useEffect(() => {
-    return () => {
-      if (shouldPreserveMemoryUrlsRef.current) {
-        return
-      }
+    coverPreviewUrlRef.current = mainData.coverPreviewUrl
+  }, [mainData.coverPreviewUrl])
 
-      memoryItemsRef.current.forEach((memory) => {
-        if (memory.imagePreviewUrl) {
-          URL.revokeObjectURL(memory.imagePreviewUrl)
-        }
-      })
+  useEffect(() => {
+    storyPhotoPreviewUrlRef.current = mainData.storyPhotoPreviewUrl
+  }, [mainData.storyPhotoPreviewUrl])
+
+  useEffect(() => {
+    return () => {
+      revokeCurrentPreviewUrls()
     }
   }, [])
 
+  const revokeCurrentPreviewUrls = () => {
+    if (coverPreviewUrlRef.current) {
+      URL.revokeObjectURL(coverPreviewUrlRef.current)
+      coverPreviewUrlRef.current = undefined
+    }
+
+    if (storyPhotoPreviewUrlRef.current) {
+      URL.revokeObjectURL(storyPhotoPreviewUrlRef.current)
+      storyPhotoPreviewUrlRef.current = undefined
+    }
+
+    memoryItemsRef.current.forEach((memory) => {
+      if (memory.imagePreviewUrl) {
+        URL.revokeObjectURL(memory.imagePreviewUrl)
+      }
+    })
+
+    memoryItemsRef.current = memoryItemsRef.current.map((memory) => ({
+      id: memory.id,
+    }))
+  }
+
+  const clearTemporaryImageState = (savedData: RetrospectiveData) => {
+    const cleanMemoryItems =
+      savedData.memories.length > 0
+        ? savedData.memories.map((memory) => ({ id: memory.id }))
+        : [{ id: 1 }]
+
+    coverPreviewUrlRef.current = undefined
+    storyPhotoPreviewUrlRef.current = undefined
+    memoryItemsRef.current = cleanMemoryItems
+
+    setMainData(({ coupleName, retrospectiveTitle, subtitle, startDate }) => ({
+      coupleName,
+      retrospectiveTitle,
+      subtitle,
+      startDate,
+    }))
+    setMemoryItems(cleanMemoryItems)
+  }
+
   const handlePrevious = () => {
+    if (isSubmitting) {
+      return
+    }
+
+    setSubmitError(null)
     setCurrentStep((step) => Math.max(1, step - 1))
   }
 
   const handleNext = () => {
-    if (currentStep === createSteps.length) {
-      shouldPreserveMemoryUrlsRef.current = true
-      onFinish(buildRetrospectivePayload())
+    if (isSubmitting) {
       return
     }
 
+    if (currentStep === createSteps.length) {
+      void handleFinishRetrospective()
+      return
+    }
+
+    setSubmitError(null)
     setCurrentStep((step) => Math.min(createSteps.length, step + 1))
   }
 
@@ -224,6 +306,54 @@ export function CreateRetrospectiveScreen({
         [field]: event.target.value,
       }))
     }
+
+  const handleCoverImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0]
+
+    if (!selectedFile) {
+      return
+    }
+
+    const coverPreviewUrl = URL.createObjectURL(selectedFile)
+
+    setMainData((currentData) => {
+      if (currentData.coverPreviewUrl) {
+        URL.revokeObjectURL(currentData.coverPreviewUrl)
+      }
+
+      return {
+        ...currentData,
+        coverFile: selectedFile,
+        coverPreviewUrl,
+      }
+    })
+
+    event.target.value = ''
+  }
+
+  const handleStoryPhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0]
+
+    if (!selectedFile) {
+      return
+    }
+
+    const storyPhotoPreviewUrl = URL.createObjectURL(selectedFile)
+
+    setMainData((currentData) => {
+      if (currentData.storyPhotoPreviewUrl) {
+        URL.revokeObjectURL(currentData.storyPhotoPreviewUrl)
+      }
+
+      return {
+        ...currentData,
+        storyPhotoFile: selectedFile,
+        storyPhotoPreviewUrl,
+      }
+    })
+
+    event.target.value = ''
+  }
 
   const handleMusicMessageInputChange =
     (field: keyof Pick<MusicMessageForm, 'songTitle' | 'artistName'>) =>
@@ -301,28 +431,81 @@ export function CreateRetrospectiveScreen({
       event.target.value = ''
     }
 
-  const buildRetrospectivePayload = (): RetrospectiveData => {
+  const handleFinishRetrospective = async () => {
+    setSubmitError(null)
+    setIsSubmitting(true)
+
+    try {
+      const finalData = await buildRetrospectivePayload()
+      const savedRetrospective = await createRetrospective(finalData)
+      const savedData: RetrospectiveData = {
+        ...finalData,
+        id: savedRetrospective.id,
+        slug: savedRetrospective.slug,
+        createdAt: savedRetrospective.created_at,
+        coverUrl: savedRetrospective.cover_url ?? finalData.coverUrl,
+        storyPhotoUrl:
+          savedRetrospective.story_photo_url ?? finalData.storyPhotoUrl,
+        memories:
+          savedRetrospective.memories.length > 0
+            ? savedRetrospective.memories
+            : finalData.memories,
+      }
+
+      revokeCurrentPreviewUrls()
+      clearTemporaryImageState(savedData)
+      onCreated?.(savedData)
+      setCreatedRetrospective(savedData)
+      setIsSubmitting(false)
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'NÃ£o foi possÃ­vel preparar sua retrospectiva. Tente novamente.'
+
+      setSubmitError(message)
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleOpenCreatedRetrospective = () => {
+    if (!createdRetrospective?.slug) {
+      setSubmitError('Não foi possível abrir a retrospectiva gerada.')
+      return
+    }
+
+    onFinish(createdRetrospective)
+    navigate(`/retrospectiva/${encodeURIComponent(createdRetrospective.slug)}`)
+  }
+
+  const buildRetrospectivePayload = async (): Promise<RetrospectiveData> => {
     const lyrics = previewMessageLines.length > 0
       ? previewMessageLines
       : retrospectiveData.lyrics
-    const memories: RetrospectiveMemory[] = memoryItems
-      .slice(0, MAX_MEMORIES)
-      .map((memory, index) => {
-        const fallbackMemory = retrospectiveData.memories[index]
+    const coverUrl = mainData.coverFile
+      ? await uploadCoverImage(mainData.coverFile)
+      : undefined
+    const storyPhotoUrl = mainData.storyPhotoFile
+      ? await uploadStoryPhoto(mainData.storyPhotoFile)
+      : undefined
+    const memories: RetrospectiveMemory[] = await Promise.all(
+      memoryItems.slice(0, MAX_MEMORIES).map(async (memory) => {
+        const imageUrl = memory.file ? await uploadMemoryImage(memory.file) : undefined
 
         return {
           id: memory.id,
-          title: fallbackMemory?.title,
-          caption: fallbackMemory?.caption,
-          imagePreviewUrl: memory.imagePreviewUrl,
+          imageUrl,
         }
-      })
+      }),
+    )
 
     return {
       coupleName: mainData.coupleName.trim() || retrospectiveData.coupleName,
       retrospectiveTitle:
         mainData.retrospectiveTitle.trim() || retrospectiveData.retrospectiveTitle,
       subtitle: mainData.subtitle.trim() || retrospectiveData.subtitle,
+      coverUrl,
+      storyPhotoUrl,
       startDate: mainData.startDate || retrospectiveData.startDate,
       songTitle: musicMessage.songTitle.trim() || retrospectiveData.songTitle,
       artistName: musicMessage.artistName.trim() || retrospectiveData.artistName,
@@ -330,6 +513,33 @@ export function CreateRetrospectiveScreen({
       lyrics,
       memories: memories.length > 0 ? memories : retrospectiveData.memories,
     }
+  }
+
+  if (createdRetrospective) {
+    return (
+      <main className="flex min-h-svh w-full items-stretch justify-center bg-[radial-gradient(circle_at_50%_0%,oklch(34%_0.13_356)_0%,oklch(15%_0.032_344)_46%,oklch(8%_0.018_342)_100%)] text-pearl md:items-center md:p-6">
+        <motion.section
+          className="relative flex min-h-svh w-full max-w-[430px] flex-col overflow-hidden bg-ink px-6 pb-8 pt-9 shadow-romance-panel ring-1 ring-pearl/15 md:min-h-[min(780px,calc(100svh-3rem))] md:rounded-[2rem] md:px-8"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div aria-hidden="true" className="absolute inset-0">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,oklch(41%_0.15_356_/_0.34),transparent_34%),linear-gradient(180deg,oklch(13%_0.026_344),oklch(8%_0.018_342)_64%,oklch(5%_0.015_342))]" />
+            <div className="absolute -top-24 left-1/2 size-72 -translate-x-1/2 rounded-full bg-blush/18 blur-3xl" />
+            <div className="absolute right-[-5rem] top-36 size-56 rounded-full bg-wine/48 blur-3xl" />
+            <div className="absolute bottom-12 left-[-6rem] size-64 rounded-full bg-roseglow/14 blur-3xl" />
+          </div>
+
+          <div className="relative z-10 my-auto py-6">
+            <RetrospectiveCreatedCard
+              publicUrl={getPublicRetrospectiveUrl(createdRetrospective.slug)}
+              onOpen={handleOpenCreatedRetrospective}
+            />
+          </div>
+        </motion.section>
+      </main>
+    )
   }
 
   return (
@@ -381,11 +591,99 @@ export function CreateRetrospectiveScreen({
               onPrevious={handlePrevious}
               onNext={handleNext}
               primaryActionLabel={
-                currentStep === createSteps.length ? 'Ver retrospectiva' : 'Continuar'
+                isSubmitting
+                  ? 'Preparando...'
+                  : currentStep === createSteps.length
+                    ? 'Ver retrospectiva'
+                    : 'Continuar'
               }
+              isSubmitting={isSubmitting}
             >
               {currentStep === 1 && (
                 <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
+                  <div>
+                    <span className="mb-2 block text-[0.7rem] font-bold uppercase tracking-[0.18em] text-mist/76">
+                      Imagem de capa
+                    </span>
+
+                    <label className="group relative block aspect-square cursor-pointer overflow-hidden rounded-[1.25rem] border border-pearl/10 bg-[radial-gradient(circle_at_26%_22%,oklch(75%_0.17_8_/_0.42),transparent_30%),radial-gradient(circle_at_78%_74%,oklch(56%_0.18_316_/_0.36),transparent_34%),linear-gradient(145deg,oklch(24%_0.07_354),oklch(13%_0.035_342)_55%,oklch(20%_0.07_316))] shadow-[0_16px_38px_oklch(4%_0.012_342_/_0.42),inset_0_1px_0_oklch(96%_0.012_348_/_0.1)] focus-within:outline focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-blush">
+                      {mainData.coverPreviewUrl ? (
+                        <img
+                          src={mainData.coverPreviewUrl}
+                          alt="Prévia da imagem de capa"
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 grid place-items-center">
+                          <div className="grid size-14 place-items-center rounded-full border border-pearl/14 bg-ink/34 text-blush shadow-[0_0_30px_oklch(69%_0.21_356_/_0.3)] backdrop-blur-md">
+                            <ImagePlus className="size-6" strokeWidth={2.4} aria-hidden="true" />
+                          </div>
+                        </div>
+                      )}
+
+                      <div
+                        aria-hidden="true"
+                        className="absolute inset-0 bg-[linear-gradient(180deg,transparent_42%,oklch(5%_0.018_342_/_0.86)_100%)]"
+                      />
+
+                      <span className="absolute inset-x-3 bottom-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-pearl/12 bg-ink/58 px-4 text-sm font-bold text-pearl shadow-[inset_0_1px_0_oklch(96%_0.012_348_/_0.1)] backdrop-blur-md transition duration-200 group-hover:bg-blush/20">
+                        <ImagePlus className="size-4" strokeWidth={2.4} aria-hidden="true" />
+                        {mainData.coverPreviewUrl ? 'Trocar imagem' : 'Adicionar capa'}
+                      </span>
+
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={handleCoverImageChange}
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <span className="mb-1 block text-[0.7rem] font-bold uppercase tracking-[0.18em] text-mist/76">
+                      Foto da nossa história
+                    </span>
+                    <p className="mb-2 text-xs font-medium leading-5 text-mist/58">
+                      Essa imagem aparecerá no card de tempo juntos.
+                    </p>
+
+                    <label className="group relative block aspect-[1.55] cursor-pointer overflow-hidden rounded-[1.25rem] border border-pearl/10 bg-[radial-gradient(circle_at_22%_30%,oklch(75%_0.17_8_/_0.42),transparent_32%),radial-gradient(circle_at_78%_68%,oklch(56%_0.18_316_/_0.4),transparent_36%),linear-gradient(145deg,oklch(24%_0.07_354),oklch(13%_0.035_342)_56%,oklch(20%_0.07_316))] shadow-[0_16px_38px_oklch(4%_0.012_342_/_0.42),inset_0_1px_0_oklch(96%_0.012_348_/_0.1)] focus-within:outline focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-blush">
+                      {mainData.storyPhotoPreviewUrl ? (
+                        <img
+                          src={mainData.storyPhotoPreviewUrl}
+                          alt="Prévia da foto da nossa história"
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 grid place-items-center">
+                          <div className="grid size-14 place-items-center rounded-full border border-pearl/14 bg-ink/34 text-blush shadow-[0_0_30px_oklch(69%_0.21_356_/_0.3)] backdrop-blur-md">
+                            <Heart className="size-5 fill-current" strokeWidth={2.4} aria-hidden="true" />
+                          </div>
+                        </div>
+                      )}
+
+                      <div
+                        aria-hidden="true"
+                        className="absolute inset-0 bg-[linear-gradient(180deg,oklch(5%_0.018_342_/_0.12),oklch(5%_0.018_342_/_0.82)_100%)]"
+                      />
+
+                      <span className="absolute inset-x-3 bottom-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-pearl/12 bg-ink/58 px-4 text-sm font-bold text-pearl shadow-[inset_0_1px_0_oklch(96%_0.012_348_/_0.1)] backdrop-blur-md transition duration-200 group-hover:bg-blush/20">
+                        <ImagePlus className="size-4" strokeWidth={2.4} aria-hidden="true" />
+                        {mainData.storyPhotoPreviewUrl
+                          ? 'Trocar foto'
+                          : 'Adicionar foto'}
+                      </span>
+
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={handleStoryPhotoChange}
+                      />
+                    </label>
+                  </div>
+
                   {mainDataFields.map((field) => (
                     <label key={field.id} className="block">
                       <span className="mb-2 block text-[0.7rem] font-bold uppercase tracking-[0.18em] text-mist/76">
@@ -573,12 +871,76 @@ export function CreateRetrospectiveScreen({
                     </p>
                   </div>
 
+                  {(isSubmitting || submitError) && (
+                    <div
+                      className={`rounded-2xl border px-4 py-3 text-sm font-semibold leading-6 ${
+                        submitError
+                          ? 'border-blush/36 bg-blush/12 text-pearl'
+                          : 'border-pearl/10 bg-pearl/[0.06] text-mist/78'
+                      }`}
+                      role={submitError ? 'alert' : 'status'}
+                      aria-live="polite"
+                    >
+                      {submitError ?? 'Preparando sua retrospectiva...'}
+                    </div>
+                  )}
+
                   <section className={previewGroupClass}>
                     <div className="mb-4 flex items-center gap-3">
                       <div className="grid size-9 shrink-0 place-items-center rounded-full bg-blush/16 text-blush ring-1 ring-blush/22">
                         <Heart className="size-4 fill-current" strokeWidth={2.4} aria-hidden="true" />
                       </div>
                       <p className={sectionTitleClass}>Dados</p>
+                    </div>
+
+                    <div className="mb-4 grid gap-3">
+                      <div className="overflow-hidden rounded-[1rem] border border-pearl/10 bg-[radial-gradient(circle_at_28%_24%,oklch(75%_0.17_8_/_0.34),transparent_34%),linear-gradient(145deg,oklch(22%_0.06_354),oklch(12%_0.03_342))]">
+                        <div className="relative aspect-square">
+                          {mainData.coverPreviewUrl ? (
+                            <img
+                              src={mainData.coverPreviewUrl}
+                              alt="Capa selecionada"
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 grid place-items-center text-blush/80">
+                              <ImagePlus className="size-7" strokeWidth={2.4} aria-hidden="true" />
+                            </div>
+                          )}
+
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-0 bg-[linear-gradient(180deg,transparent_44%,oklch(5%_0.018_342_/_0.72)_100%)]"
+                          />
+                          <p className="absolute bottom-3 left-3 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-pearl/86">
+                            Imagem de capa
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="overflow-hidden rounded-[1rem] border border-pearl/10 bg-[radial-gradient(circle_at_28%_24%,oklch(75%_0.17_8_/_0.34),transparent_34%),linear-gradient(145deg,oklch(22%_0.06_354),oklch(12%_0.03_342))]">
+                        <div className="relative aspect-[1.55]">
+                          {mainData.storyPhotoPreviewUrl ? (
+                            <img
+                              src={mainData.storyPhotoPreviewUrl}
+                              alt="Foto da nossa história selecionada"
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 grid place-items-center text-blush/80">
+                              <Heart className="size-6 fill-current" strokeWidth={2.4} aria-hidden="true" />
+                            </div>
+                          )}
+
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-0 bg-[linear-gradient(180deg,transparent_36%,oklch(5%_0.018_342_/_0.76)_100%)]"
+                          />
+                          <p className="absolute bottom-3 left-3 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-pearl/86">
+                            Foto da nossa história
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="space-y-3">

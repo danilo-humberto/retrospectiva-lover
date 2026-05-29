@@ -19,6 +19,7 @@ export function MemoriesSection({ memories }: MemoriesSectionProps) {
   const visibleMemories =
     memories && memories.length > 0 ? memories.slice(0, 6) : retrospectiveData.memories.slice(0, 6)
   const firstMemory = visibleMemories[0]
+  const firstMemoryImageUrl = firstMemory?.imageUrl ?? firstMemory?.imagePreviewUrl
 
   const handleNext = () => {
     setActiveIndex((current) =>
@@ -51,9 +52,9 @@ export function MemoriesSection({ memories }: MemoriesSectionProps) {
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.985 }}
         >
-          {firstMemory?.imagePreviewUrl && (
+          {firstMemoryImageUrl && (
             <img
-              src={firstMemory.imagePreviewUrl}
+              src={firstMemoryImageUrl}
               alt="Memória em destaque"
               className="absolute inset-0 h-full w-full object-cover"
             />

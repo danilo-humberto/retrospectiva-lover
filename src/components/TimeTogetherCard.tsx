@@ -8,11 +8,13 @@ import { calculateTimeTogether } from "../utils/calculateTimeTogether";
 type TimeTogetherCardProps = {
   coupleName?: string;
   startDate?: string;
+  storyPhotoUrl?: string;
 };
 
 export function TimeTogetherCard({
   coupleName,
   startDate,
+  storyPhotoUrl,
 }: TimeTogetherCardProps) {
   const resolvedCoupleName = coupleName?.trim() || retrospectiveData.coupleName;
   const resolvedStartDate = startDate || retrospectiveData.startDate;
@@ -49,11 +51,23 @@ export function TimeTogetherCard({
 
       <div className="relative">
         <div className="relative mb-6 h-60 w-full overflow-hidden rounded-[1.25rem] border border-pearl/12 bg-[radial-gradient(circle_at_26%_22%,oklch(76%_0.17_8_/_0.72),transparent_28%),radial-gradient(circle_at_78%_24%,oklch(56%_0.18_316_/_0.68),transparent_32%),linear-gradient(135deg,oklch(32%_0.1_354),oklch(18%_0.065_328)_52%,oklch(10%_0.028_342))] shadow-[0_18px_48px_oklch(69%_0.21_356_/_0.2),inset_0_1px_0_oklch(96%_0.012_348_/_0.16)]">
+          {storyPhotoUrl && (
+            <img
+              src={storyPhotoUrl}
+              alt="Nossa história"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          )}
+
           <div aria-hidden="true" className="absolute inset-0">
-            <div className="absolute -left-12 top-8 size-32 rounded-full bg-blush/28 blur-3xl" />
-            <div className="absolute -right-10 bottom-2 size-36 rounded-full bg-wine/46 blur-3xl" />
-            <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent_0_32%,oklch(96%_0.012_348_/_0.12)_39%,transparent_47%),radial-gradient(circle_at_50%_55%,transparent_0_34%,oklch(6%_0.018_342_/_0.48)_76%)]" />
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,transparent,oklch(6%_0.018_342_/_0.82))]" />
+            {!storyPhotoUrl && (
+              <>
+                <div className="absolute -left-12 top-8 size-32 rounded-full bg-blush/28 blur-3xl" />
+                <div className="absolute -right-10 bottom-2 size-36 rounded-full bg-wine/46 blur-3xl" />
+              </>
+            )}
+            <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent_0_32%,oklch(96%_0.012_348_/_0.12)_39%,transparent_47%),radial-gradient(circle_at_50%_55%,transparent_0_34%,oklch(6%_0.018_342_/_0.5)_76%)]" />
+            <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,oklch(6%_0.018_342_/_0.86))]" />
           </div>
 
           <div className="relative flex h-full flex-col justify-between p-4 text-left">
